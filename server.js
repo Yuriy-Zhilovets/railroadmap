@@ -154,7 +154,7 @@ app.get("/user-info", function(req,res)
 geoGet("point");
 geoDelete("point");
 geoPost("point","Point");
-geoPut("point");
+geoPut("point", "Point");
 
 /////////////////////////////////////////
 // LineString
@@ -162,14 +162,14 @@ geoPut("point");
 geoGet("rail");
 geoGet("rail");
 geoPost("rail","LineString");
-geoPut("rail");
+geoPut("rail", "LineString");
 
 ///////////////////////////////////
 
 geoGet("station");
 geoGet("station");
 geoPost("station","Polygon");
-geoPut("station");
+geoPut("station", "Polygon");
 
 ///////////////////////////////////
 
@@ -285,14 +285,8 @@ function geoPost(cls,geoType)
         {
           return reportError(res, err);
         }
-        if (items)
-        {
-          res.send(201,items[0]);
-        }
-        else
-        {
-          reportNotFound(res);
-        }
+
+        res.send(201,items[0]);
       });
     }
     catch (e)
@@ -431,16 +425,193 @@ app.get("/map",function(req,res)
   });
 });
 
-////////////////////////////
+/////////////////////////////////////////////
+
+app.post("/user", function(req,res)
+{
+  var col = db.collection("users");
+  
+  var row = req.body;
+  delete row._id;
+  delete row.perm;
+  
+  if (!row.login || !row.passhash)
+  {
+    return sendError(res, 400, "No login or password hash");
+  }
+  
+  row.perm = {}; // права по умолчанию
+  
+  col.insert(row, {safe: true}, function(err,items)
+  {
+    if (err)
+    {
+      return reportError(res, err);
+    }
+
+    delete items[0].passhash;
+    delete items[0].perm;
+    res.send(201,items[0]);
+  });
+});
+
+app.get("/user/:id", function(req,res)
+{
+  var id = new ObjectID(req.params.id);
+  var col = db.collection("users");
+  
+  col.findOne({_id: id},function(err,item)
+  {
+    if (err)
+    {
+      return reportError(res, err);
+    }
+    if (item)
+    {
+      delete item.passhash;
+      delete item.perm;
+      res.send(200,item);
+    }
+    else
+    {
+      reportNotFound(res);
+    }
+  });
+});
+
+app.delete("/user/:id", function(req,res)
+{
+  var id = new ObjectID(req.params.id);
+  var col = db.collection("users");
+  
+  col.remove({_id: id},function(err,cnt)
+  {
+    if (err)
+    {
+      return reportError(res, err);
+    }
+    if (cnt)
+    {
+      res.send(200);
+    }
+    else
+    {
+      reportNotFound(res);
+    }
+  });
+});
+
+app.put("/user/:id", function(req,res)
+{
+  var id = new ObjectID(req.params.id);
+  
+  var row = req.body;
+  delete row._id;
+  delete row.perm;
+  
+  var col = db.collection("users");
+  col.update({_id: id},{$set: row}, function(err,cnt)
+  {
+    if (err)
+    {
+      return reportError(res, err);
+    }
+    if (cnt)
+    {
+      res.send(200);
+    }
+    else
+    {
+      reportNotFound(res);
+    }
+  });
+});
+
+/////////////////////////////////////////////
+
+app.post("/user/:id/perm", function(req,res)
+{
+  res.send(405);
+});
+
+app.delete("/user/:id/perm", function(req,res)
+{
+  res.send(405);
+});
+
+app.get("/user/:id/perm", function(req,res)
+{
+  var id = new ObjectID(req.params.id);
+  var col = db.collection("users");
+  
+  col.findOne({_id: id}, function(err, item)
+  {
+    if (err)
+    {
+      return reportError(res,err);
+    }
+    
+    if (item)
+    {
+      res.send(200, {perm: Object.keys(item.perm).join(",")});
+    }
+    else
+    {
+      reportNotFound(res);
+    }
+  });
+});
+
+app.put("/user/:id/perm", function(req,res)
+{
+  var id = new ObjectID(req.params.id);
+  var col = db.collection("users");
+  
+  var perm = {};
+  
+  if (!req.body.perm)
+  {
+    return sendError(res, 400,"Variable 'perm' is missing");
+  }
+  
+  req.body.perm.split(",").forEach(function(el)
+  {
+    perm[el] = 1;
+  });
+  
+  col.update({_id: id}, {$set: {perm: perm}}, function(err, cnt)
+  {
+    if (err)
+    {
+      return reportError(res,err);
+    }
+    
+    if (cnt)
+    {
+      res.send(200);
+    }
+    else
+    {
+      reportNotFound(res);
+    }
+  });
+});
+
+/////////////////////////////////////////////
+
+function sendError(res,code,msg)
+{
+  res.send(code, {message: msg});
+}
 
 function reportError(res,err)
 {
-  res.send(500, {message: err.message});
+  sendError(res, 500, err.message);
 }
 
 function reportNotFound(res,err)
 {
-  res.send(404, {message: "Object is not found"});
+  sendError(res, 404, "Object is not found");
 }
 
 ////////////////////////////
