@@ -91,7 +91,7 @@ app.use(app.router);
 app.use(function(err,req,res,next)
 {
   // Последний обработчик ошибок
-  res.send(500,{success: false, message: err.message, trace: err.stack});
+  res.send(500,{message: err.message, trace: err.stack});
   next(err);
 });
                                             
@@ -395,16 +395,18 @@ app.get("/map",function(req,res)
     res.send(400,{error: res.error});
   }
   
-  var y1 = r.coord[0][0];
-  var x1 = r.coord[0][1];
-  var y2 = r.coord[1][0];
-  var x2 = r.coord[1][1];
+  throw new Error();
+  
+  var x1 = r.coord[0][0];
+  var y1 = r.coord[0][1];
+  var x2 = r.coord[1][0];
+  var y2 = r.coord[1][1];
   
   col.find({geo:
               { $geoIntersects :
                 { $geometry :
                 { type : "Polygon" ,
-                        coordinates: [ [ [y1,x1] , [y1,x2] , [y2,x2] , [y2,x1], [y1,x1] ] ]
+                        coordinates: [ [ [x1,y1] , [x1,y2] , [x2,y2] , [x2,y1], [x1,y1] ] ]
                 }}}},
   function(err,cursor)
   {

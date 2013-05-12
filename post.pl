@@ -4,7 +4,7 @@ use LWP;
 use HTTP::Request::Common;
 
 my $ua = new LWP::UserAgent;
-my $req = POST "http://localhost:2000/user", [
+my $req = POST "http://localhost:2000/user/xxx/perm", [
   login => "yz",
   passhash => "12345676",
 ];
