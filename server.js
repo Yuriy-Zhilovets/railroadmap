@@ -198,80 +198,39 @@ function parseCoord(from)
 
 function geoGet(cls)
 {
-  app.get("/"+cls+"/:id",function(req,res)
+  uniGet("/"+cls+"/:id", "geo",
   {
-    try 
+    query: function(req)
     {
-      var col = db.collection("geo");
-      var id = new ObjectID(req.params.id);
-      col.findOne({_id: id, class: cls},function(err,item)
-      {
-        if (err)
-        {
-          return reportError(res, err);
-        }
-        if (item)
-        {
-          res.send(200,item);
-        }
-        else
-        {
-          reportNotFound(res);
-        }
-      });
-    }
-    catch (e)
-    {
-      reportError(res,e);
+      return {_id:  new ObjectID(req.params.id), class: cls};
     }
   });
 }
 
 function geoDelete(cls)
 {
-  app.delete("/"+cls+"/:id",function(req,res)
+  uniDel("/"+cls+"/:id","geo",
   {
-    try 
+    query: function(req)
     {
-      var col = db.collection("geo");
-      var id = new ObjectID(req.params.id);
-      col.remove({_id: id, class: cls},{single: 1}, function(err,cnt)
-      {
-        if (err)
-        {
-          return reportError(res, err);
-        }
-        if (cnt)
-        {
-          res.send(200);
-        }
-        else
-        {
-          reportNotFound(res);
-        }
-      });
-    }
-    catch (e)
-    {
-      reportError(res,e);
+      return {_id:  new ObjectID(req.params.id), class: cls};
     }
   });
 }
 
 function geoPost(cls,geoType)
 {
-  app.post("/"+cls,function(req,res)
+  uniPost("/"+cls,"geo",
   {
-    try 
+    compose: function(req)
     {
-      var col = db.collection("geo");
       var row = req.body;
 
       var result = parseCoordFun[geoType](row.coord);
       
       if (result.error)
       {
-        return res.send(400,{error: result.error});
+        return [result.error];
       }
       
       row.class = cls;
@@ -279,34 +238,29 @@ function geoPost(cls,geoType)
       delete row._id;
       delete row.coord;
       
-      col.insert(row, {safe: true}, function(err,items)
-      {
-        if (err)
-        {
-          return reportError(res, err);
-        }
-
-        res.send(201,items[0]);
-      });
-    }
-    catch (e)
-    {
-      reportError(res,e);
+      return [null,row];
     }
   });
 }
 
 function geoPut(cls,geoType)
 {
-  app.put("/"+cls+"/:id",function(req,res)
+  uniPut("/"+cls+"/:id","geo",
   {
-    try 
+    query: function(req)
     {
-      var col = db.collection("geo");
-      var id = new ObjectID(req.params.id);
+      return {_id:  new ObjectID(req.params.id), class: cls};
+    },
 
+    compose: function(req)
+    {
       var row = req.body;
       var result = parseCoordFun[geoType](row.coord);
+      
+      if (result.error)
+      {
+        return [result.error];
+      }
       
       if (result.coord)
       {
@@ -316,26 +270,8 @@ function geoPut(cls,geoType)
       delete row._id;
       delete row.type;
       delete row.coord;
-    
-      col.update({_id: id, class: cls},{$set: row}, function(err,cnt)
-      {
-        if (err)
-        {
-          return reportError(res, err);
-        }
-        if (cnt)
-        {
-          res.send(200);
-        }
-        else
-        {
-          reportNotFound(res);
-        }
-      });
-    }
-    catch (e)
-    {
-      reportError(res,e);
+
+      return [null, {$set: row}];
     }
   });
 }
@@ -395,8 +331,6 @@ app.get("/map",function(req,res)
     res.send(400,{error: res.error});
   }
   
-  throw new Error();
-  
   var x1 = r.coord[0][0];
   var y1 = r.coord[0][1];
   var x2 = r.coord[1][0];
@@ -429,104 +363,51 @@ app.get("/map",function(req,res)
 
 /////////////////////////////////////////////
 
-app.post("/user", function(req,res)
+uniPost("/user", "users", 
 {
-  var col = db.collection("users");
-  
-  var row = req.body;
-  delete row._id;
-  delete row.perm;
-  
-  if (!row.login || !row.passhash)
+  compose: function(req)
   {
-    return sendError(res, 400, "No login or password hash");
+    var row = req.body;
+    delete row._id;
+    delete row.perm;
+  
+    if (!row.login || !row.passhash)
+    {
+      return ["No login or password hash"];
+    }
+  
+    row.perm = {}; // права по умолчанию
+    
+    return [null,row];
+  },
+  
+  modify: function(item)
+  {
+    delete item.passhash;
+    delete item.perm;
+  },
+});
+
+uniGet("/user/:id", "users", 
+{
+  modify: function(item) 
+  {
+    delete item.passhash;
+    delete item.perm;
   }
-  
-  row.perm = {}; // права по умолчанию
-  
-  col.insert(row, {safe: true}, function(err,items)
-  {
-    if (err)
-    {
-      return reportError(res, err);
-    }
-
-    delete items[0].passhash;
-    delete items[0].perm;
-    res.send(201,items[0]);
-  });
 });
 
-app.get("/user/:id", function(req,res)
-{
-  var id = new ObjectID(req.params.id);
-  var col = db.collection("users");
-  
-  col.findOne({_id: id},function(err,item)
-  {
-    if (err)
-    {
-      return reportError(res, err);
-    }
-    if (item)
-    {
-      delete item.passhash;
-      delete item.perm;
-      res.send(200,item);
-    }
-    else
-    {
-      reportNotFound(res);
-    }
-  });
-});
+uniDel("/user/:id", "users");
 
-app.delete("/user/:id", function(req,res)
+uniPut("/user/:id", "users", 
 {
-  var id = new ObjectID(req.params.id);
-  var col = db.collection("users");
-  
-  col.remove({_id: id},function(err,cnt)
+  compose: function(req,res)
   {
-    if (err)
-    {
-      return reportError(res, err);
-    }
-    if (cnt)
-    {
-      res.send(200);
-    }
-    else
-    {
-      reportNotFound(res);
-    }
-  });
-});
-
-app.put("/user/:id", function(req,res)
-{
-  var id = new ObjectID(req.params.id);
-  
-  var row = req.body;
-  delete row._id;
-  delete row.perm;
-  
-  var col = db.collection("users");
-  col.update({_id: id},{$set: row}, function(err,cnt)
-  {
-    if (err)
-    {
-      return reportError(res, err);
-    }
-    if (cnt)
-    {
-      res.send(200);
-    }
-    else
-    {
-      reportNotFound(res);
-    }
-  });
+    var row = req.body;
+    delete row._id;
+    delete row.perm;
+    return [null, {$set: row}];
+  },
 });
 
 /////////////////////////////////////////////
@@ -541,63 +422,165 @@ app.delete("/user/:id/perm", function(req,res)
   res.send(405);
 });
 
-app.get("/user/:id/perm", function(req,res)
+uniGet("/user/:id/perm", "users", 
 {
-  var id = new ObjectID(req.params.id);
-  var col = db.collection("users");
-  
-  col.findOne({_id: id}, function(err, item)
+  modify: function(item)
   {
-    if (err)
-    {
-      return reportError(res,err);
-    }
-    
-    if (item)
-    {
-      res.send(200, {perm: Object.keys(item.perm).join(",")});
-    }
-    else
-    {
-      reportNotFound(res);
-    }
-  });
+    item = {perm: Object.keys(item.perm).join(",")};
+  }
 });
 
-app.put("/user/:id/perm", function(req,res)
+uniPut("/user/:id/perm", "users", 
 {
-  var id = new ObjectID(req.params.id);
-  var col = db.collection("users");
+  compose: function(req)
+  {  
+    var perm = {};
   
-  var perm = {};
-  
-  if (!req.body.perm)
-  {
-    return sendError(res, 400,"Variable 'perm' is missing");
-  }
-  
-  req.body.perm.split(",").forEach(function(el)
-  {
-    perm[el] = 1;
-  });
-  
-  col.update({_id: id}, {$set: {perm: perm}}, function(err, cnt)
-  {
-    if (err)
+    if (!req.body.perm)
     {
-      return reportError(res,err);
+      return ["Variable 'perm' is missing"];
     }
+  
+    req.body.perm.split(",").forEach(function(el)
+    {
+      perm[el] = 1;
+    });
     
-    if (cnt)
-    {
-      res.send(200);
-    }
-    else
-    {
-      reportNotFound(res);
-    }
-  });
+    return [null, {$set: {perm: perm}}];
+  }
 });
+
+/////////////////////////////////////////////////////////
+
+function queryByID(req)
+{
+  return {_id: new ObjectID(req.params.id)};
+}
+
+function composeAll(req)
+{
+  var row = req.body;
+  delete row._id;
+  return [null,row];
+}
+
+function uniGet(url,collection,arg)
+{
+  arg = arg || {};
+  app.get(url, function(req,res)
+  {
+    var col = db.collection(collection);
+    var q = (arg.query||queryByID)(req);
+  
+    col.findOne(q,function(err,item)
+    {
+      if (err)
+      {
+        return reportError(res, err);
+      }
+      if (item)
+      {
+        if (arg.modify)
+        {
+          arg.modify(item);
+        }
+        res.send(200,item);
+      }
+      else
+      {
+        reportNotFound(res);
+      }
+    });
+  });
+};
+
+function uniDel(url,collection,arg)
+{
+  arg = arg || {};
+  app.delete(url, function(req,res)
+  {
+    var col = db.collection("users");
+    var q = (arg.query||queryByID)(req);
+  
+    col.remove(q, {single: 1}, function(err,cnt)
+    {
+      if (err)
+      {
+        return reportError(res, err);
+      }
+      if (cnt)
+      {
+        res.send(200);
+      }
+      else
+      {
+        reportNotFound(res);
+      }
+    });
+  });
+}
+
+function uniPut(url,collection,arg)
+{
+  arg = arg || {};
+  app.put(url, function(req,res)
+  {
+    var col = db.collection(collection);
+    var q = (arg.query||queryByID)(req);
+    
+    var data = (arg.compose||composeAll)(req);
+    if (data[0])
+    {
+      return sendError(res, 400, data[0]);
+    }
+  
+    col.update(q, data[1], function(err,cnt)
+    {
+      if (err)
+      {
+        return reportError(res, err);
+      }
+      if (cnt)
+      {
+        res.send(200);
+      }
+      else
+      {
+        reportNotFound(res);
+      }
+    });
+});
+}
+
+function uniPost(url, collection, arg)
+{
+  app.post(url, function(req,res)
+  {
+    var col = db.collection(collection);
+    var q = (arg.query||queryByID)(req);
+    
+    var data = (arg.compose||composeAll)(req);
+    if (data[0])
+    {
+      return sendError(res, 400, data[0]);
+    }
+  
+    col.insert(data[1], {safe: true}, function(err,items)
+    {
+      if (err)
+      {
+        return reportError(res, err);
+      }
+
+      if (arg.modify)
+      {
+        arg.modify(items[0]);
+      }
+    
+      res.send(201,items[0]);
+    });
+  });
+}
 
 /////////////////////////////////////////////
 
