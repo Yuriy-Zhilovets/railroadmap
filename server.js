@@ -9,6 +9,8 @@ var ObjectID = mongo.ObjectID;
 var express = require('express');
 var app = express();
 
+var async = require("async");
+
 //app.use(express.logger());
 app.use(express.favicon());
 app.use(express.bodyParser());
@@ -450,6 +452,67 @@ uniPut("/user/:id/perm", "users",
   }
 });
 
+/////////////////////////// /owner
+
+uniGet("/owner/:id","owners");
+uniDel("/owner/:id","owners");
+
+app.post("/owner", function(req,res)
+{
+  var col = db.collection("owners");
+  
+  var row = req.body;
+  delete row._id;
+
+  var q = row.parent ? { _id: new ObjectID(row.parent) } : { _id: {$exists: false} };
+  
+  async.waterfall(
+  [
+    function(callback)
+    {
+      col.findOne(q, callback);
+    },
+    function(item, callback)
+    {
+      if (row.parent && !item)
+      {
+        return callback(reqError(400,"Parent does not exist"));
+      }
+      
+      col.insert(row, {safe: true}, callback);
+    },
+  ], 
+  finalPost);
+});
+
+app.put("/owner/:id", function(req,res)
+{
+    var col = db.collection("owners");
+    
+    var row = req.body;
+    delete row._id;
+    
+    var q = row.parent ? { _id: new ObjectID(row.parent) } : { _id: {$exists: false} };
+    
+    async.waterfall(
+    [
+      function(callback)
+      {
+        col.findOne(q, callback);
+      },
+      function(item, callback)
+      {
+        if (row.parent && !item)
+        {
+          return callback(reqError(400,"Parent does not exist"));
+        }
+      
+        col.update(queryByID(req), row, callback);
+      },
+    ], 
+    finalPut);
+});
+
 /////////////////////////////////////////////////////////
 
 function queryByID(req)
@@ -534,22 +597,8 @@ function uniPut(url,collection,arg)
       return sendError(res, 400, data[0]);
     }
   
-    col.update(q, data[1], function(err,cnt)
-    {
-      if (err)
-      {
-        return reportError(res, err);
-      }
-      if (cnt)
-      {
-        res.send(200);
-      }
-      else
-      {
-        reportNotFound(res);
-      }
-    });
-});
+    col.update(q, data[1], finalPut);
+  });
 }
 
 function uniPost(url, collection, arg)
@@ -557,7 +606,6 @@ function uniPost(url, collection, arg)
   app.post(url, function(req,res)
   {
     var col = db.collection(collection);
-    var q = (arg.query||queryByID)(req);
     
     var data = (arg.compose||composeAll)(req);
     if (data[0])
@@ -567,19 +615,45 @@ function uniPost(url, collection, arg)
   
     col.insert(data[1], {safe: true}, function(err,items)
     {
-      if (err)
-      {
-        return reportError(res, err);
-      }
-
-      if (arg.modify)
-      {
-        arg.modify(items[0]);
-      }
-    
-      res.send(201,items[0]);
+      finalPost(err,items,arg);
     });
   });
+}
+
+function finalPut(err, cnt) 
+{
+  if (err)
+  {
+    sendError(res, err.status||500, err.message);
+  }
+  else
+  {
+    if (cnt)
+    {
+      res.send(200);
+    }
+    else
+    {
+      reportNotFound(res);
+    }
+  }
+}
+
+function finalPost(err, items, args)
+{
+  var args = args || {};
+  
+  if (err)
+  {
+    sendError(res, err.status||500, err.message);
+  }
+
+  if (arg.modify)
+  {
+    arg.modify(items[0]);
+  }
+    
+  res.send(201,items[0]);
 }
 
 /////////////////////////////////////////////
@@ -594,9 +668,16 @@ function reportError(res,err)
   sendError(res, 500, err.message);
 }
 
-function reportNotFound(res,err)
+function reportNotFound(res)
 {
   sendError(res, 404, "Object is not found");
+}
+
+function reqError(code,message)
+{
+  var e = new Error(message);
+  e.status = code;
+  return e;
 }
 
 ////////////////////////////

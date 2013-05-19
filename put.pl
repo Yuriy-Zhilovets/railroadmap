@@ -4,8 +4,8 @@ use LWP;
 use HTTP::Request::Common;
 
 my $ua = new LWP::UserAgent;
-my $req = POST "http://localhost:2000/user/518a5e2ffdef83dd30000001/perm", [
-  perm => "hello,again", 
+my $req = POST "http://localhost:2000/owner/5197f512aae8c7073e000003", [
+  name=>"hello",
 ];
 $req->method("PUT");
 print $req->as_string;
