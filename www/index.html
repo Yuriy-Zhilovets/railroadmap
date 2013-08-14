@@ -1,15 +1,10 @@
 <!doctype html>
 <html>
 <head>
-	<script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js" ></script>
-	<script src="/inheritance.js" ></script>
-	<script src="//cdnjs.cloudflare.com/ajax/libs/underscore.js/1.4.4/underscore-min.js"></script>
 	<link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet-0.5.1/leaflet.css" />
 	<!--[if lte IE 8]>
 	    <link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet-0.5.1/leaflet.ie.css" />
 	<![endif]-->
-
-	<script src="http://cdn.leafletjs.com/leaflet-0.5.1/leaflet.js"></script>
 	<style>
 
 	body {
@@ -23,17 +18,23 @@
 	}
 
 	.top-menu {
-		height: 30px;
-		position:absolute;
+		position: absolute;
 		width: 100%;
-		text-align:center;
-		top: 0px;
-		left:0px;
-		padding-top: 5px;
+		text-align: center;
+		bottom: 0px;
+		left: 0px;
+		padding-top: 7px;
+		border-bottom: 21px solid whitesmoke;
+		box-shadow: 0px 3px 5px rgb(187, 187, 187);
+		z-index: 2;
+		background-color: white;
+		display: none;
+		padding: 10px;
+		box-sizing: border-box;
 	}
 
 	#map {
-		margin-top: 30px;
+		
 	}
 
 	.edit-menu {
@@ -50,22 +51,115 @@
 		padding: 20px;
 		display:none;
 	}
+	
+	select, input {
+		border: 1px solid grey;
+	}
+	
+	button {
+		padding: 10px;
+		border: 1px solid white;
+		cursor: pointer;
+		border-radius: 3px;
+	}
+	button:hover {
+		padding: 10px;
+		border: 1px solid grey;
+		background-color: white;
+	}
+	
+	#add-object {
+		padding: 1px;
+	}
 
+	#add-object > span {
+		font-size: 14px;
+	}
+	#add-object div.btn {
+		display: inline-block;
+		background-color: whitesmoke;
+		border: 1px solid grey;
+		border-radius: 3px;
+		padding: 1px 7px;
+		cursor: pointer;
+	}
+	#add-object div.btn:hover {
+		border: 1px solid whitesmoke;
+		background-color: white;
+	}
+	
+	.title {
+		font-size: 26px;
+		font-weight: bold;
+		font-style: italic;
+		position: absolute;
+		top: -10px;
+		left: -10px;
+		opacity: 0.7;
+		background: white;
+		padding: 25px 30px 15px 60px;
+		border-radius: 10px;
+	}
+	
+	.edit-button {
+		font-size: 12px;
+		margin-right: 10px;
+		position: absolute;
+		top: 90px;
+		right: 0px;
+		background-color: rgb(255, 169, 16);
+		border-radius: 5px;
+		padding: 5px 12px;
+		box-shadow: 1px 2px 6px grey;
+		cursor: pointer;
+		z-index: 100400;
+		border: 1px solid rgb(184, 104, 31);
+		color: rgb(20, 20, 20);
+	}
+	
+	.edit-button:hover {
+		background-color: whitesmoke;
+	}
+	
+	
+	.top-menu .login-form {
+		position: absolute;
+		right: 10px;
+		top: 8px;
+	}
+	.top-menu .login-form button {
+		padding: 2px 18px;
+		border: 1px solid rgb(128, 128, 128);
+	}
+	
+	button.login {
+		
+	}
+	
+	.form-field {
+		padding: 7px 0px;
+	}
 
 	</style>
 </head>
 <body>
 <div class="container">
 	<div class="top-menu">
-		<div>
-			Add: 
-			<select id="add-object">
-				<option value="0">select...</option>
-				<option value="1">Line</option>
-				<option value="2">Station</option>
-				<option value="3">Depot</option>
-				<option value="4">Other object</option>
-			</select>
+		<div id="add-object">
+			<span>
+				Add new:
+			</span> 
+			<div class="object-icons">
+			</div>
+		</div>
+		<div class="login-form">
+			<button class="signup">
+				Sign Up
+			</button>
+			&nbsp;&nbsp;
+			<button class="login">
+				Login
+			</button>
 		</div>
 	</div>
 	<div class="edit-menu">
@@ -76,205 +170,29 @@
 
 		</div>
 	</div>
-</div>
-<script>
+	<div class="title">
+		RailRoadMap
+	</div>
+	<div class="edit-button">
+		Edit objects
+	</div>
+</div>	
+<script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js" ></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/underscore.js/1.4.4/underscore-min.js"></script>
+<script src="http://cdn.leafletjs.com/leaflet-0.5.1/leaflet.js"></script>
 
-	var app = {
-		editing: false, //object that we edit in this moment, only one at a time
-		data: function(field){
-			if(field == 'owners'){
-				return {
-					'1': 'Donetsk railway',
-					'2': 'Odeska railway',
-					'3': 'Great Funk Railroad',
-				}
-			}
-		},
-		setEditable: function(obj){
-			if(this.editing){
-				this.editing.stopEdit()
-			} else {
-				$(".edit-menu").show().animate({width: '200px'}, 1000)
-			}
-			this.editing = obj
-			this.editing.startEdit($(".edit-menu"))
-		},
-		removeEditable: function(){
-			$(".edit-menu").show().animate({width: '0px'}, 1000).hide().html('')
-			this.editing = false
-		}
-	}
-
-	var objects = []
-	var ids = {}
-	
-	var state = {
-		lat: 48.119809,
-		lon: 37.850304,
-		z: 12,
-		l: 'qst',
-	}
-
-	var addToolbarHandlers = function(){
-		$("#add-object").change(function(){
-			var obj;
-			var val = $(this).val();
-			switch(val){
-				case '1':
-					obj = new Line()
-				break;
-				case '2':
-					obj = new Station()
-				break;
-				default:
-					return false
-				break;
-			}
-			objects.push(obj)
-			app.setEditable(obj)
-			var self = $(this);
-			setTimeout(function(){ self.val('0')}, 1);
-		})
-	}
-
-	var persistState = function(obj){
-		for(var i in obj){
-			state[i] = obj[i]
-		}
-		updateUrlFromState()
-	}
-
-	var updateStateFromUrl = function(){
-		var req = {}
-		var pars = document.location.hash.replace("#", "").split("&")
-		for(var i in pars){
-			pars[i] = pars[i].split("=")
-			if(pars[i][0] && pars[i][1]) req[pars[i][0]] = pars[i][1]
-		}
-		for(var i in req){
-			state[i] = req[i]
-		}
-	}
-
-	var updateUrlFromState = function(){
-		var hash = []
-		for(var i in state){
-			if(state[i]){
-				hash.push(i + '=' + state[i])
-			}
-		}
-		document.location.hash = '#' + hash.join("&")
-	}
-
-	var adjustMapSize = function(){
-		$("#map").width($(window).width()).height($(window).height() - Number($("#map").css('margin-top').replace("px", "")))
-	}
-
-	var onMapMove = function(){
-		persistState({
-			z: map.getZoom(),
-			lat: map.getCenter().lat, 
-			lon: map.getCenter().lng,
-		})
-		var bounds = map.getBounds()
-		var nw = bounds.getNorthWest()
-		var se = bounds.getSouthEast()
-		$.getJSON('/map?coord=' + nw.lng + ',' + nw.lat + ',' + se.lng + ',' + se.lat, function(data){
-			_.each(data, function(ob){
-				if(ids[ob._id]) {
-					return false
-				}
-				else {
-					var obj = false;
-					switch(ob['class']){
-						case 'rail':
-							obj = new Line(ob, ob.geo.coordinates)
-						break;
-						case 'station':
-							obj = new Station(ob, ob.geo.coordinates)
-						break;
-						default:
-							return false;
-						break;
-					}
-					ids[ob._id] = obj
-					objects.push(obj)
-					obj.redraw()
-				}
-			})
-		})
-	}
-
-	var launchMap = function(){
-		adjustMapSize()
-		// create a map in the "map" div, set the view to a given place and zoom
-		var map = L.map('map').setView([state.lat, state.lon], state.z)
-		window.map = map
-
-		// add an OpenStreetMap tile layer
-		L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {
-		    attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
-		}).addTo(map)
-		$(window).resize(function(){
-			adjustMapSize()
-		})
-		var layers = {
-			osm: new L.TileLayer('http://{s}.tile.osmosnimki.ru/kosmo/{z}/{x}/{y}.png'),
-			mpn: new L.TileLayer('http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'),
-			qst: new L.TileLayer('http://otile1.mqcdn.com/tiles/1.0.0/osm/{z}/{x}/{y}.png', {attribution:'Tiles Courtesy of <a href="http://www.mapquest.com/" target="_blank">MapQuest</a> <img src="http://developer.mapquest.com/content/osm/mq_logo.png">'}),
-		}
-		//var ggl = new L.Google();
-		map.addLayer(layers[state['l']])
-		map.addControl(new L.Control.Layers({
-			'OSM': layers['osm'],
-			'Mapnik': layers['mpn'],
-			'MapQuest': layers['qst'],
-			//'Google':ggl
-		}))
-		map.on('zoomend', function(){
-			var el = $("#map").parent()
-			el.removeClass()
-			if(map.getZoom() < 12){
-				el.addClass('giantzoom')
-			} else {
-				if(map.getZoom() < 13){
-					el.addClass('largezoom')
-				} else {
-					if(map.getZoom() < 12){
-						el.addClass('middlezoom')
-					} else {
-						el.addClass('smallzoom')
-					}
-				}
-			}
-			var mz = map.getZoom()
-			$(".leaflet-marker-icon").each(function(){
-				if($(this).attr('src').match(/\d{3}\.png/)){
-					if(mz < 13) $(this).show()
-					else $(this).hide()
-				}
-			})
-			onMapMove()
-		})
-		map.on('dragend', function(){
-			onMapMove()
-		});
-		$(".leaflet-control-layers.leaflet-control.leaflet-control-layers").addClass("leaflet-control-expanded").addClass("leaflet-control-layers-expanded").mouseout(function(){
-			$(this).addClass("leaflet-control-expanded").addClass("leaflet-control-layers-expanded");
-		})
-	}
-</script>
+<script src="/inheritance.js" ></script>
+<script src="/mixins.js"></script></script>
+<script src="/app.js"></script></script>
 <script src="/objects.js" ></script>
 <script>
-
 $(function(){
 	// main startup function
-	updateStateFromUrl()
-	updateUrlFromState()
-	launchMap()
-	addToolbarHandlers()
-})
-
+	updateStateFromUrl();
+	updateUrlFromState();
+	launchMap();
+	addToolbarHandlers();
+});
 </script>
 </body>
 </html>

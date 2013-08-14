@@ -1,17 +1,30 @@
-
+(function(){
 	var MapObject = Class.extend({
-		init: function(){},
 		obj: {},
 		type: 'MapObject',
 		redraw: function(){},
 		hide: function(){},
 		editing: false,
-		startEdit: function($el){},
-		stopEdit: function(){},
+		group: false,
 		saveEdit: function(){},
 		style: {color: 'green'},
 		editStyle: {color: 'red'},
 		fields: {},
+		get: function(field){
+			if(this.fields[field] && this.fields[field]['value']){
+				return this.fields[field]['value'];
+			}
+		},
+		set: function(field, value){
+			var self = this;
+			if(_.isObject(field) && !value){
+				_.each(field, function(value, key){ self.set(key, value);});
+			} else {
+				if(this.fields[field]){
+					this.fields[field]['value'] = value;
+				}
+			}		
+		},
 		name: 'object',
 		getGeoCoords: function(){
 			var crds = []
@@ -22,7 +35,9 @@
 			return crds.join(",")
 		},
 		buildForm: function(){
-			var str = ['<div class="main-form"><h2>Edit ' + this.name + '</h2>'];
+			var title = 'Edit ' + this.name
+			if(this.editTitle) title = this.editTitle
+			var str = ['<div class="main-form"><h2>' + title + '</h2>'];
 			for(var i in this.fields){
 				var f = this.fields[i];
 				switch(this.fields[i].type){
@@ -40,9 +55,29 @@
 					case 'text':
 						str.push('<div class="form-field"><div>' + f.name + ': </div><div><input type="text" name="' + i + '" value="' + (this.data[i] || '' ) + '" /></div></div>');						
 					break;
+					case 'password':
+						str.push('<div class="form-field"><div>' + f.name + ': </div><div><input type="password" name="' + i + '" value="' + (this.data[i] || '' ) + '" /></div></div>');						
+					break;
+					case 'checkbox':
+						str.push('<div class="form-field"><div><input type="checkbox" name="' + i + '" value="' + (this.data[i] || '' ) + '" /> - ' + f.name + '</div></div>');						
+					break;
 				}
 			}
 			str.push('<br><button name="save">Save</button>&nbsp;&nbsp;<button name="discard">Discard</button></div>')
+			return str.join("")
+		},
+		buildInfo: function(){
+			var title = this.name
+			var str = ['<div class="object-info"><h2>' + title + '</h2>'];
+			for(var i in this.fields){
+				var f = this.fields[i];
+				switch(f.type){
+					default:
+						str.push('<div class="info-name">' + f + '</div><div class="info-val">' + this.get(i) + '</div>');			
+					break;
+				}
+			}
+			str.push('</div>');	
 			return str.join("")
 		},
 		markers: [],
@@ -94,6 +129,7 @@
 	  		this.markers.push(marker)
 		},
 		startEdit: function($el){
+			alert('start edit');
 			var self = this;
 			this.original_coords = _.clone(this.coords);
 		/////////////////////////////// CREATING FORM		
@@ -130,8 +166,7 @@
 		  		return false;
 		  	})
 		  	$el.find("button[name=discard]").click(function(){
-				this.coords = this.original_coords;
-				console.dir(this.original_coords)
+				self.coords = self.original_coords;
 		  		self.stopEdit()
 		  		app.removeEditable()
 		  		return false;
@@ -155,18 +190,45 @@
 		coords: [],
 	})
 
+	var User = MapObject.extend({
+		type: 'user',
+		name: 'user',
+		backendName: 'user',
+		redraw: function(){},
+		editTitle: 'Register',
+		fields: {
+			'login': { // e.g. Donetska railway
+				name: 'Login',
+				type: 'text',
+			},
+			'email': {
+				name: 'Email',
+				type: 'text',
+			},
+			'pw': {
+				name: 'Password',
+				type: 'password',
+			},
+			'confirm': {
+				name: 'I read and accept the <a href="/rules.html">rules</a>',
+				type: 'checkbox',
+			},
+		}
+	})
+
+
 	var Line = MapObject.extend({
 		type: 'line',
 		name: 'line',
+		group: 'rrm',
 		backendName: 'rail',
 		redraw: function(){
 			var self = this;
 			if(this.obj){
 				map.removeLayer(this.obj)
 			}
-			var style
-			if(this.editing) style = this.editStyle
-			else style = this.style
+			var style = this.editing ? this.editStyle : this.style;
+			console.dir(this.coords)
 			this.obj = L.polyline(this.coords, style).addTo(map).on('click', function(e){
 				self.addMarker(e.latlng)
 			});
@@ -179,8 +241,8 @@
 			},
 			'gauge_width': {
 				name: 'Gauge width',
-				type: 'text',
-				values: app.data('gauges'),
+				type: 'select',
+				values: app.data('gauge'),
 			},
 			'year_start': {
 				name: 'Build',
@@ -195,10 +257,11 @@
 		}
 	})
 
-	var Station = MapObject.extend({
-		type: 'station',
-		name: 'station',
-		backendName: 'station',
+	var Buddy = MapObject.extend({
+		type: 'object',
+		name: 'object',
+		group: 'rrm',
+		backendName: 'object',
 		/*getGeoCoords: function(){
 			var crds = []
 			var cordz = _.clone(this.coords);
@@ -231,6 +294,29 @@
 				type: 'select',
 				values: app.data('owners'),
 			},
+			'type': {
+				name: 'Object type',
+				type: 'select',
+				values: app.data('buddy'),
+			},
+		}
+	})
+
+	var Station = Buddy.extend({
+		type: 'station',
+		name: 'station',
+		group: 'rrm',
+		backendName: 'station',
+		fields: {
+			'title': { // e.g. Donetska railway
+				name: 'Name',
+				type: 'text',
+			},
+			'owner': { // e.g. Donetska railway
+				name: 'Belongs to',
+				type: 'select',
+				values: app.data('owners'),
+			},
 			'gauge_width': {
 				name: 'Gauge width',
 				type: 'text',
@@ -248,3 +334,16 @@
 			},
 		}
 	})
+	
+	Station.group = 'rrm';
+	Buddy.group = 'rrm';
+	Line.group = 'rrm';
+	
+	window.objectPool  = {
+		'Station': Station,
+		'Buddy': Buddy,
+		'Line': Line,
+		'User': User,	
+	}
+	
+}());

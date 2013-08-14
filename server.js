@@ -648,9 +648,9 @@ function finalPost(err, items, args)
     sendError(res, err.status||500, err.message);
   }
 
-  if (arg.modify)
+  if (args.modify)
   {
-    arg.modify(items[0]);
+    args.modify(items[0]);
   }
     
   res.send(201,items[0]);
